@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import AuthButton from './AuthButton';
 
 export default function Navbar() {
   const [isLight, setIsLight] = useState(false);
@@ -74,6 +75,9 @@ export default function Navbar() {
               </svg>
             )}
           </button>
+
+          {/* Auth Button */}
+          <AuthButton />
         </div>
       </div>
     </nav>
