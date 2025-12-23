@@ -70,6 +70,9 @@ export async function POST(request) {
                         status: cloudItem.status,
                         lastProgress: cloudItem.lastProgress,
                         notes: cloudItem.notes,
+                        thumbnailUrl: cloudItem.series.thumbnailUrl,
+                        externalId: cloudItem.series.externalId,
+                        alternateTitles: cloudItem.series.alternateTitles,
                         createdAt: cloudItem.createdAt,
                         updatedAt: cloudItem.updatedAt,
                         syncAction: "kept_cloud",
@@ -88,6 +91,9 @@ export async function POST(request) {
                     status: cloudItem.status,
                     lastProgress: cloudItem.lastProgress,
                     notes: cloudItem.notes,
+                    thumbnailUrl: cloudItem.series.thumbnailUrl,
+                    externalId: cloudItem.series.externalId,
+                    alternateTitles: cloudItem.series.alternateTitles,
                     createdAt: cloudItem.createdAt,
                     updatedAt: cloudItem.updatedAt,
                     syncAction: "cloud_only",
@@ -111,16 +117,42 @@ export async function POST(request) {
 
 // Helper: Upsert a series for a user
 async function upsertUserSeries(userId, data) {
-    const { title, type, status, lastProgress, notes } = data;
+    const { title, type, status, lastProgress, notes, externalId, thumbnailUrl, alternateTitles } = data;
 
     // Find or create the series
-    let series = await prisma.series.findUnique({
-        where: { title_type: { title, type } },
-    });
+    let series = null;
+
+    if (externalId) {
+        series = await prisma.series.findUnique({
+            where: { externalId_type: { externalId, type } },
+        });
+    }
+
+    if (!series) {
+        series = await prisma.series.findFirst({
+            where: { title, type }, // Fallback for legacy data or manual entry
+        });
+    }
 
     if (!series) {
         series = await prisma.series.create({
-            data: { title, type },
+            data: {
+                title,
+                type,
+                externalId,
+                thumbnailUrl,
+                alternateTitles: alternateTitles || []
+            },
+        });
+    } else if (externalId && !series.externalId) {
+        // Upgrade legacy series with canonical data if matched
+        await prisma.series.update({
+            where: { id: series.id },
+            data: {
+                externalId,
+                thumbnailUrl: thumbnailUrl || series.thumbnailUrl,
+                alternateTitles: alternateTitles || series.alternateTitles
+            }
         });
     }
 
@@ -152,6 +184,9 @@ async function upsertUserSeries(userId, data) {
         status: userSeries.status,
         lastProgress: userSeries.lastProgress,
         notes: userSeries.notes,
+        thumbnailUrl: userSeries.series.thumbnailUrl,
+        externalId: userSeries.series.externalId,
+        alternateTitles: userSeries.series.alternateTitles,
         createdAt: userSeries.createdAt,
         updatedAt: userSeries.updatedAt,
     };

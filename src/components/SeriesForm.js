@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSeries } from "@/lib/store";
+import TitleAutocomplete from "./TitleAutocomplete";
 
 export default function SeriesForm() {
     const { addSeries } = useSeries();
@@ -11,6 +12,9 @@ export default function SeriesForm() {
         status: "reading",
         lastProgress: "",
         notes: "",
+        externalId: null,
+        thumbnailUrl: null,
+        alternateTitles: [],
     });
 
     const handleSubmit = (e) => {
@@ -24,6 +28,9 @@ export default function SeriesForm() {
             status: "reading",
             lastProgress: "",
             notes: "",
+            externalId: null,
+            thumbnailUrl: null,
+            alternateTitles: [],
         });
     };
 
@@ -40,19 +47,24 @@ export default function SeriesForm() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Title Input */}
-                <div className="md:col-span-2 input-group">
-                    <input
-                        type="text"
-                        required
-                        className="input-field"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        placeholder=" "
-                        id="title"
+                {/* Title Input - Autocomplete */}
+                <div className="md:col-span-2">
+                    <TitleAutocomplete
+                        type={formData.type}
+                        initialValue={formData.title}
+                        onSelect={(item) => {
+                            const newType = item.type || formData.type;
+                            setFormData({
+                                ...formData,
+                                title: item.title,
+                                externalId: item.externalId,
+                                thumbnailUrl: item.thumbnailUrl,
+                                alternateTitles: item.alternateTitles,
+                                type: newType,
+                                status: newType === "anime" ? "watching" : "reading"
+                            });
+                        }}
                     />
-                    <label htmlFor="title" className="input-label">Title</label>
-                    <div className="input-underline" />
                 </div>
 
                 {/* Type Select */}
@@ -62,7 +74,14 @@ export default function SeriesForm() {
                         <select
                             className="w-full p-3 bg-transparent border-b-2 border-black/10 light:border-gray-200 text-foreground focus:outline-none focus:border-blade-green transition-colors duration-150 appearance-none cursor-pointer"
                             value={formData.type}
-                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                setFormData({
+                                    ...formData,
+                                    type: newType,
+                                    status: newType === "anime" ? "watching" : "reading"
+                                });
+                            }}
                         >
                             <option value="manga" className="bg-background">Manga</option>
                             <option value="manhwa" className="bg-background">Manhwa</option>
@@ -83,9 +102,19 @@ export default function SeriesForm() {
                             value={formData.status}
                             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                         >
-                            <option value="reading" className="bg-background">Reading</option>
-                            <option value="completed" className="bg-background">Completed</option>
-                            <option value="on-hold" className="bg-background">On Hold</option>
+                            {formData.type === "anime" ? (
+                                <>
+                                    <option value="watching" className="bg-background">Watching</option>
+                                    <option value="completed" className="bg-background">Completed</option>
+                                    <option value="on-hold" className="bg-background">On Hold</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="reading" className="bg-background">Reading</option>
+                                    <option value="completed" className="bg-background">Completed</option>
+                                    <option value="on-hold" className="bg-background">On Hold</option>
+                                </>
+                            )}
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
                             <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>

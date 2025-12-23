@@ -2,27 +2,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050505;
-  --foreground: #e0e0e0;
-
-  /* Blade Aura Palette (Dark/Default) */
-  --color-primary: #39ff14;
-  /* Neon Green */
-  --color-secondary: #ff4500;
-  /* Molten Orange */
-  --color-accent: #c0c0c0;
-  /* Blade Silver */
-  --color-surface: #111111;
-
-  --font-display: 'Anton', sans-serif;
-  --font-body: 'Inter', sans-serif;
-}
-
-/* Light Mode Overrides - Sharp Action Aesthetic */
-.light {
   --background: #F9FAFB;
   --foreground: #2D3748;
 
+  /* Sharp Action Aesthetic (Light/Default) */
   --color-primary: #2ECC71;
   /* Sharp Green */
   --color-secondary: #F39C12;
@@ -30,9 +13,26 @@
   --color-accent: #2ECC71;
   /* Green accent */
   --color-surface: #FFFFFF;
+
+  --font-display: 'Anton', sans-serif;
+  --font-body: 'Inter', sans-serif;
 }
 
-@variant light (&:where(.light, .light *));
+/* Dark Mode Overrides - Blade Aura Palette */
+.dark {
+  --background: #050505;
+  --foreground: #e0e0e0;
+
+  --color-primary: #39ff14;
+  /* Neon Green */
+  --color-secondary: #ff4500;
+  /* Molten Orange */
+  --color-accent: #c0c0c0;
+  /* Blade Silver */
+  --color-surface: #111111;
+}
+
+@variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -54,22 +54,23 @@ body {
   font-family: var(--font-body);
   min-height: 100vh;
   overflow-x: hidden;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  overflow-x: hidden;
+  transition: background-color 0.15s ease, color 0.15s ease, background-image 0.15s ease;
 }
 
-/* Dark Mode Background (Default) */
-body:not(.light) {
-  background-image:
-    radial-gradient(circle at 15% 50%, rgba(57, 255, 20, 0.08) 0%, transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(255, 69, 0, 0.08) 0%, transparent 25%);
-}
-
-/* Light Mode Background - Subtle logo-inspired gradient */
-.light body,
-body.light {
+/* Light Mode Background (Default) - Subtle logo-inspired gradient */
+body {
   background-image:
     linear-gradient(135deg, rgba(46, 204, 113, 0.04) 0%, transparent 40%),
     linear-gradient(225deg, rgba(243, 156, 18, 0.04) 0%, transparent 40%);
+}
+
+/* Dark Mode Background */
+.dark body,
+body.dark {
+  background-image:
+    radial-gradient(circle at 15% 50%, rgba(57, 255, 20, 0.08) 0%, transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(255, 69, 0, 0.08) 0%, transparent 25%);
 }
 
 /* ===== BLADE COMPONENT STYLES ===== */
@@ -90,11 +91,14 @@ body.light {
   box-shadow: 0 8px 24px rgba(46, 204, 113, 0.15);
 }
 
-body:not(.light) .blade-card {
+/* Dark Mode Card Overrides */
+.dark .blade-card,
+body.dark .blade-card {
   border-color: #222;
 }
 
-body:not(.light) .blade-card:hover {
+.dark .blade-card:hover,
+body.dark .blade-card:hover {
   border-color: var(--color-primary);
   box-shadow: 0 4px 20px rgba(57, 255, 20, 0.15);
 }
@@ -141,13 +145,15 @@ body:not(.light) .blade-card:hover {
 }
 
 /* Dark mode button adjustments */
-body:not(.light) .blade-button {
+.dark .blade-button,
+body.dark .blade-button {
   background: transparent;
   border: 1px solid var(--color-primary);
   color: var(--color-primary);
 }
 
-body:not(.light) .blade-button:hover {
+.dark .blade-button:hover,
+body.dark .blade-button:hover {
   background: var(--color-primary);
   color: #000;
   box-shadow: 0 0 15px rgba(57, 255, 20, 0.6);
@@ -163,13 +169,15 @@ body:not(.light) .blade-button:hover {
   box-shadow: 0 4px 16px rgba(243, 156, 18, 0.4);
 }
 
-body:not(.light) .blade-button-secondary {
+.dark .blade-button-secondary,
+body.dark .blade-button-secondary {
   background: transparent;
   border-color: var(--color-secondary);
   color: var(--color-secondary);
 }
 
-body:not(.light) .blade-button-secondary:hover {
+.dark .blade-button-secondary:hover,
+body.dark .blade-button-secondary:hover {
   background: var(--color-secondary);
   color: #000;
   box-shadow: 0 0 15px rgba(255, 69, 0, 0.6);
@@ -238,7 +246,8 @@ body:not(.light) .blade-button-secondary:hover {
   border-radius: 4px;
 }
 
-body:not(.light) .panel-form {
+.dark .panel-form,
+body.dark .panel-form {
   background: rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(8px);
@@ -260,7 +269,8 @@ body:not(.light) .panel-form {
   transition: border-color 0.14s ease;
 }
 
-body:not(.light) .input-field {
+.dark .input-field,
+body.dark .input-field {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -289,7 +299,8 @@ body:not(.light) .input-field {
   font-weight: 600;
 }
 
-body:not(.light) .input-label {
+.dark .input-label,
+body.dark .input-label {
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -325,7 +336,8 @@ body:not(.light) .input-label {
   font-weight: 500;
 }
 
-body:not(.light) .mood-chip {
+.dark .mood-chip,
+body.dark .mood-chip {
   background: rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.1);
 }
@@ -341,7 +353,8 @@ body:not(.light) .mood-chip {
   box-shadow: 0 0 12px rgba(46, 204, 113, 0.25);
 }
 
-body:not(.light) .mood-chip.active {
+.dark .mood-chip.active,
+body.dark .mood-chip.active {
   background: rgba(57, 255, 20, 0.15);
   box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
 }
@@ -359,7 +372,8 @@ body:not(.light) .mood-chip.active {
   cursor: pointer;
 }
 
-body:not(.light) .genre-tag {
+.dark .genre-tag,
+body.dark .genre-tag {
   background: rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.1);
 }
@@ -375,7 +389,8 @@ body:not(.light) .genre-tag {
   color: var(--color-secondary);
 }
 
-body:not(.light) .genre-tag.active {
+.dark .genre-tag.active,
+body.dark .genre-tag.active {
   background: rgba(255, 69, 0, 0.15);
   box-shadow: 0 0 10px rgba(255, 69, 0, 0.2);
 }
@@ -432,7 +447,8 @@ body:not(.light) .genre-tag.active {
   position: relative;
 }
 
-body:not(.light) .rec-card {
+.dark .rec-card,
+body.dark .rec-card {
   background: rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(8px);
@@ -443,7 +459,8 @@ body:not(.light) .rec-card {
   box-shadow: 0 8px 32px rgba(46, 204, 113, 0.12);
 }
 
-body:not(.light) .rec-card:hover {
+.dark .rec-card:hover,
+body.dark .rec-card:hover {
   box-shadow: 0 8px 32px rgba(57, 255, 20, 0.1);
   border-color: rgba(57, 255, 20, 0.3);
 }
@@ -457,7 +474,8 @@ body:not(.light) .rec-card:hover {
   margin-top: 1rem;
 }
 
-body:not(.light) .rec-why {
+.dark .rec-why,
+body.dark .rec-why {
   background: rgba(57, 255, 20, 0.08);
 }
 
@@ -482,7 +500,8 @@ body:not(.light) .rec-why {
   transition: all 0.14s ease;
 }
 
-body:not(.light) .section-card {
+.dark .section-card,
+body.dark .section-card {
   background: rgba(0, 0, 0, 0.3);
   border-color: rgba(255, 255, 255, 0.05);
 }
@@ -502,7 +521,8 @@ body:not(.light) .section-card {
   transition: all 0.14s ease;
 }
 
-body:not(.light) .roadmap-card {
+.dark .roadmap-card,
+body.dark .roadmap-card {
   background: rgba(0, 0, 0, 0.3);
   border-color: rgba(255, 255, 255, 0.05);
   border-top-color: var(--color-primary);
@@ -538,7 +558,8 @@ body:not(.light) .roadmap-card {
   border-radius: 8px;
 }
 
-body:not(.light) .glass-panel {
+.dark .glass-panel,
+body.dark .glass-panel {
   background: rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(8px);
@@ -572,13 +593,15 @@ body:not(.light) .glass-panel {
   border-left-color: var(--color-primary);
 }
 
-body:not(.light) .library-card {
+.dark .library-card,
+body.dark .library-card {
   background: rgba(0, 0, 0, 0.5);
   border-color: rgba(255, 255, 255, 0.08);
   border-left-color: var(--color-primary);
 }
 
-body:not(.light) .library-card:hover {
+.dark .library-card:hover,
+body.dark .library-card:hover {
   box-shadow: 0 4px 20px rgba(57, 255, 20, 0.15);
   border-color: rgba(57, 255, 20, 0.3);
   border-left-color: var(--color-primary);
@@ -596,7 +619,8 @@ body:not(.light) .library-card:hover {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
-body:not(.light) .update-modal {
+.dark .update-modal,
+body.dark .update-modal {
   background: #1a1a1a;
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);

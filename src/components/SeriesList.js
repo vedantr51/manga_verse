@@ -7,6 +7,7 @@ export default function SeriesList() {
     const { series, deleteSeries, updateSeries } = useSeries();
     const [editingItem, setEditingItem] = useState(null);
     const [editValue, setEditValue] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
 
     const openEditModal = (item) => {
         setEditingItem(item);
@@ -27,7 +28,8 @@ export default function SeriesList() {
 
     const handleMarkUpToDate = () => {
         if (editingItem) {
-            updateSeries(editingItem.id, { lastProgress: "Up to date", status: "reading" });
+            const newStatus = editingItem.type === "anime" ? "watching" : "reading";
+            updateSeries(editingItem.id, { lastProgress: "Up to date", status: newStatus });
             closeEditModal();
         }
     };
@@ -47,6 +49,16 @@ export default function SeriesList() {
         }
     };
 
+    const filteredSeries = series.filter((item) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = item.title.toLowerCase().includes(query);
+        const matchesAlternate = item.alternateTitles?.some(
+            (alt) => alt.toLowerCase().includes(query)
+        );
+        return matchesTitle || matchesAlternate;
+    });
+
     if (series.length === 0) {
         return (
             <div className="text-center py-12 text-gray-500">
@@ -59,15 +71,51 @@ export default function SeriesList() {
     return (
         <>
             <div className="space-y-4">
-                <h2 className="Heading-lg text-2xl mb-6 text-foreground">Your Library</h2>
-                {series.slice().reverse().map((item) => (
+                <div className="flex items-center justify-between gap-4 mb-6">
+                    <h2 className="Heading-lg text-2xl text-foreground whitespace-nowrap">Your Library</h2>
+
+                    {/* Library Search */}
+                    <div className="relative max-w-xs w-full">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search library..."
+                            className="w-full pl-9 pr-3 py-1.5 bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 rounded-md text-sm focus:outline-none focus:border-blade-green"
+                        />
+                        <svg className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+
+                {filteredSeries.length === 0 && searchQuery && (
+                    <div className="text-center py-8 text-gray-500">
+                        <p>No results found for "{searchQuery}"</p>
+                    </div>
+                )}
+
+                {filteredSeries.slice().reverse().map((item) => (
                     <div
                         key={item.id}
-                        className="library-card group"
+                        className="library-card group flex gap-4"
                     >
-                        <div className="flex-grow">
+                        {/* Thumbnail */}
+                        <div className="w-16 h-24 bg-gray-200 dark:bg-zinc-800 flex-shrink-0 rounded overflow-hidden">
+                            {item.thumbnailUrl ? (
+                                <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <svg className="w-8 h-8 opacity-20" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-grow min-w-0">
                             <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                <h3 className="font-bold text-xl text-foreground group-hover:text-blade-green transition-colors duration-150">{item.title}</h3>
+                                <h3 className="font-bold text-xl text-foreground group-hover:text-blade-green transition-colors duration-150 truncate max-w-full">{item.title}</h3>
                                 <span className={`text-xs font-bold px-2.5 py-1 uppercase tracking-wider
                                     ${item.type === 'anime'
                                         ? 'bg-purple-500/15 text-purple-600 light:text-purple-700 border border-purple-500/30'
@@ -79,7 +127,7 @@ export default function SeriesList() {
                                     {item.type}
                                 </span>
                                 <span className={`text-xs font-bold px-2.5 py-1 uppercase tracking-wider
-                                    ${item.status === 'reading'
+                                    ${item.status === 'reading' || item.status === 'watching'
                                         ? 'bg-blue-500/15 text-blue-600 light:text-blue-700 border border-blue-500/30'
                                         : item.status === 'completed'
                                             ? 'bg-teal-500/15 text-teal-600 light:text-teal-700 border border-teal-500/30'
@@ -95,23 +143,23 @@ export default function SeriesList() {
                             </p>
 
                             {item.notes && (
-                                <p className="text-sm text-gray-500 italic border-l-2 border-blade-green/50 pl-3 py-1 bg-blade-green/5 rounded-r w-fit pr-3">
+                                <p className="text-sm text-gray-500 italic border-l-2 border-blade-green/50 pl-3 py-1 bg-blade-green/5 rounded-r w-fit pr-3 truncate">
                                     "{item.notes}"
                                 </p>
                             )}
                         </div>
 
-                        <div className="flex items-start gap-3 md:opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <div className="flex flex-col items-end gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                             <button
                                 onClick={() => openEditModal(item)}
-                                className="text-xs px-4 py-2 border border-gray-300 light:border-gray-300 text-foreground hover:bg-blade-green/10 hover:border-blade-green transition-colors duration-150"
+                                className="text-xs px-4 py-2 border border-gray-300 light:border-gray-300 text-foreground hover:bg-blade-green/10 hover:border-blade-green transition-colors duration-150 w-24"
                                 style={{ clipPath: 'polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%)' }}
                             >
                                 Update
                             </button>
                             <button
                                 onClick={() => deleteSeries(item.id)}
-                                className="text-xs px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 transition-colors duration-150"
+                                className="text-xs px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 transition-colors duration-150 w-24"
                                 style={{ clipPath: 'polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%)' }}
                             >
                                 Delete
@@ -145,11 +193,16 @@ export default function SeriesList() {
                         </button>
 
                         {/* Modal header */}
-                        <div className="mb-5">
-                            <h3 className="Heading-lg text-lg text-foreground">Update Progress</h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                                <span className="text-blade-green font-semibold">{editingItem.title}</span>
-                            </p>
+                        <div className="mb-5 flex gap-4">
+                            {editingItem.thumbnailUrl && (
+                                <img src={editingItem.thumbnailUrl} alt="" className="w-12 h-16 object-cover rounded" />
+                            )}
+                            <div>
+                                <h3 className="Heading-lg text-lg text-foreground line-clamp-2">{editingItem.title}</h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Updating progress...
+                                </p>
+                            </div>
                         </div>
 
                         {/* Quick Actions */}

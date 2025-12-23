@@ -33,6 +33,9 @@ export async function GET() {
             status: us.status,
             lastProgress: us.lastProgress,
             notes: us.notes,
+            thumbnailUrl: us.series.thumbnailUrl,
+            externalId: us.series.externalId,
+            alternateTitles: us.series.alternateTitles,
             createdAt: us.createdAt,
             updatedAt: us.updatedAt,
         }));
@@ -88,16 +91,48 @@ export async function POST(request) {
 
 // Helper: Upsert a series for a user
 async function upsertUserSeries(userId, data) {
-    const { title, type, status, lastProgress, notes } = data;
+    const { title, type, status, lastProgress, notes, externalId, thumbnailUrl, alternateTitles } = data;
 
     // Find or create the series
-    let series = await prisma.series.findUnique({
-        where: { title_type: { title, type } },
-    });
+    // Logic: 
+    // 1. If externalId is provided, try to find by externalId + type
+    // 2. If not found or no externalId, try to find by title + type (legacy/manual fallback)
+    // 3. Create if doesn't exist
+
+    let series = null;
+
+    if (externalId) {
+        series = await prisma.series.findUnique({
+            where: { externalId_type: { externalId, type } },
+        });
+    }
+
+    if (!series) {
+        series = await prisma.series.findFirst({
+            where: { title, type }, // Fallback for legacy data or manual entry
+        });
+    }
 
     if (!series) {
         series = await prisma.series.create({
-            data: { title, type },
+            data: {
+                title,
+                type,
+                externalId,
+                thumbnailUrl,
+                alternateTitles: alternateTitles || []
+            },
+        });
+    } else if (externalId && !series.externalId) {
+        // If we found an existing manual entry but now have an externalId, update it
+        // This effectively "upgrades" legacy data to canonical data
+        await prisma.series.update({
+            where: { id: series.id },
+            data: {
+                externalId,
+                thumbnailUrl: thumbnailUrl || series.thumbnailUrl,
+                alternateTitles: alternateTitles || series.alternateTitles
+            }
         });
     }
 
@@ -129,6 +164,10 @@ async function upsertUserSeries(userId, data) {
         status: userSeries.status,
         lastProgress: userSeries.lastProgress,
         notes: userSeries.notes,
+        // Return canonical data for UI
+        thumbnailUrl: userSeries.series.thumbnailUrl,
+        externalId: userSeries.series.externalId,
+        alternateTitles: userSeries.series.alternateTitles,
         createdAt: userSeries.createdAt,
         updatedAt: userSeries.updatedAt,
     };

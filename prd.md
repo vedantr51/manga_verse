@@ -1,175 +1,254 @@
-1. Objective
+1. Feature Overview
 
-Move MangaVerse from working authentication + database to a fully synced, user-aware experience, and prepare the system for AI personalization without implementing AI yet.
+This feature improves data consistency, usability, and scalability by introducing:
 
-2. Current State (Confirmed)
+Intelligent title suggestions while adding anime/manga
 
-Users can sign up and log in
+Canonical title storage to prevent duplicates
 
-Same user can log in from multiple devices
+Search within the user’s library
 
-Sessions are managed correctly
+Visual identification using preview thumbnails
 
-Prisma + Neon + Auth.js are stable
+Support for multiple content types (anime / manga / manhwa)
 
-UserSeries data is stored per user
+This feature applies to:
 
-No piracy or content hosting
+Track Your Journey (add/update flow)
 
-3. Phase 4A – Data Sync & User Isolation (IMMEDIATE)
-3.1 Session-Based Access Control
+Your Library (browse/search flow)
 
-Goal:
-Ensure every API and DB query is scoped to the logged-in user.
+2. Problem Statement
+Current Problems
 
-Requirements:
+Users manually type titles → spelling variations create duplicates
 
-Every server action must call auth()
+Example:
 
-Extract session.user.id
+“My Hero Academia”
 
-Use it as a mandatory filter in Prisma queries
+“My Hero : Academia”
 
-Acceptance Criteria:
+“Boku no Hero Academia”
 
-A user can never see or modify another user’s data
+Large libraries become hard to navigate without search
 
-Unauthenticated requests fail gracefully
+Similar titles cause confusion without visual context
 
-3.2 Local → Cloud Sync on Login
+Poor title normalization reduces:
 
-Goal:
-Merge local (guest) progress into the cloud account.
+Sync accuracy
 
-Rules:
+Analytics reliability
 
-Local data exists before login
+AI recommendation quality later
 
-On login:
+3. Goals & Success Criteria
+Goals
 
-Compare local and cloud entries
+Make adding titles fast and error-free
 
-If local is newer → overwrite cloud
+Enforce one canonical title per anime
 
-If cloud is newer → keep cloud
+Prevent duplicate records at DB level
 
-Matching key: (userId + seriesId)
+Improve UX with previews
 
-Conflict Resolution:
+Prepare clean data for future AI personalization
 
-Use updatedAt or lastModified
+Success Criteria
 
-Never delete data automatically
+Same anime always maps to the same stored title
 
-3.3 Cloud → Local Hydration
+No duplicate anime entries caused by formatting differences
 
-Goal:
-After login, hydrate UI from the database.
+Users can find anime quickly in large libraries
 
-Flow:
+UI remains responsive and lightweight
 
-User logs in
+4. Track Your Journey – Title Suggestions
+4.1 Title Input Behavior
 
-Fetch all UserSeries for that user
+When the user starts typing a title:
 
-Populate app state
+Suggestions appear in real time
 
-UI reflects cloud truth
+Suggestions are fetched from a trusted metadata source
 
-4. Phase 4A – UX Improvements
-4.1 Auth UX States
+Input becomes selection-based, not free-text
 
-Required UI States:
+Allowed Inputs
 
-Loading (session resolving)
+Selecting a suggestion (preferred)
 
-Logged out (local-only mode)
+Manual entry only if no match exists (optional, controlled)
 
-Logged in (cloud-sync enabled)
+4.2 Suggestions Content
 
-Copy Guidance:
+Each suggestion should display:
 
-Logged out: “Progress saved locally”
+Canonical title (primary)
 
-Logged in: “Progress synced across devices”
+Alternate titles (optional, secondary)
 
-4.2 Error Handling
+Preview thumbnail
 
-Rules:
+Content type:
 
-No raw Prisma errors in UI
+Anime
 
-All errors mapped to human-readable messages
+Manga
 
-Auth errors never return HTML
+Manhwa
 
-5. Phase 4B – AI Readiness (NO AI CALLS YET)
-5.1 AI Boundaries (Locked)
+This helps users disambiguate titles with similar names.
 
-AI will:
+4.3 Canonical Title Enforcement
 
-Recommend manga/anime
+When a user selects a suggestion:
 
-Analyze user preferences
+The canonical title ID is saved in DB
 
-Suggest next reads
+Display title may vary
 
-AI will NOT:
+Stored identifier does NOT
 
-Fetch chapters
+This ensures:
 
-Provide illegal links
+“My Hero Academia”
 
-Scrape copyrighted content
+“Boku no Hero Academia”
+→ both resolve to the same internal record
 
-5.2 Data Preparation for AI
+5. Status Enhancements
+5.1 New Status Option
 
-Prepare these fields (no inference yet):
+Add a new status under tracking:
 
-Reading status distribution
+watching
 
-Genre frequency
+Supported statuses now include:
 
-Completion rate
+watching
 
-Drop-off patterns
+reading
 
-Store as derived data or compute on demand.
+completed
 
-6. Non-Goals (Explicitly Out of Scope)
+planned
 
-OAuth providers (Google, Discord)
+dropped
 
-Payment / subscriptions
+This aligns with anime-first usage and improves clarity.
 
-AI inference
+6. Your Library – Search & Discovery
+6.1 Library Search Bar
 
-Social features
+Add a search bar at the top of Your Library.
 
-Public profiles
+Search should:
 
-7. Success Criteria
+Be case-insensitive
 
-Phase 4A is complete when:
+Match canonical title
 
-Login sync works reliably
+Match alternate titles
 
-Same account works across devices
+Match partial strings
 
-No data leakage between users
+Example:
 
-App works offline + online
+“hero”
 
-Ready to plug in AI without refactor
+“academia”
 
-8. Engineering Principles (Must Follow)
+“boku”
 
-Local-first always
+All should return My Hero Academia.
 
-Cloud is optional enhancement
+6.2 Search Result Display
 
-No silent failures
+Each result should show:
 
-Explicit user ownership of data
+Thumbnail
 
-Privacy > features
+Canonical title
+
+Current user status
+
+Progress (if applicable)
+
+This improves scannability in large libraries.
+
+7. Data Model Considerations (Important)
+Canonical Content Entity
+
+Introduce (or prepare for) a central content entity:
+
+contentId (canonical)
+
+canonicalTitle
+
+alternateTitles[]
+
+type (anime / manga / manhwa)
+
+thumbnailUrl
+
+UserSeries Relationship
+
+User data references:
+
+userId
+
+contentId
+
+status
+
+progress
+
+timestamps
+
+This prevents duplication by design, not just UX.
+
+8. Non-Goals (Explicit)
+
+This feature does NOT:
+
+Fetch episodes or chapters
+
+Host or stream content
+
+Use AI inference yet
+
+Allow arbitrary free-text duplicates
+
+9. Future Compatibility (Phase 4B+)
+
+This design enables:
+
+Accurate reading pattern analysis
+
+Genre clustering
+
+Clean AI training signals
+
+Cross-device consistency
+
+No refactor required later.
+
+10. Acceptance Checklist
+
+ Suggestions appear while typing
+
+ Titles are selectable, not free-form
+
+ Canonical title stored consistently
+
+ Duplicate anime entries prevented
+
+ Library search works smoothly
+
+ Thumbnails shown in suggestions & search
+
+ Status “watching” available

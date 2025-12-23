@@ -70,13 +70,17 @@ model VerificationToken {
 // ============================================
 
 model Series {
-  id    String @id @default(cuid())
-  title String
-  type  String // manga, manhwa, anime
+  id              String   @id @default(cuid())
+  title           String
+  type            String   // manga, manhwa, anime
+  externalId      String?  // MAL ID from Jikan API (canonical identifier)
+  thumbnailUrl    String?  // Cover image URL for visual identification
+  alternateTitles String[] // Synonyms for library search matching
 
   users UserSeries[]
 
-  @@unique([title, type])
+  @@unique([externalId, type])
+  @@index([title])
 }
 
 model UserSeries {
