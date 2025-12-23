@@ -1,160 +1,175 @@
-🎯 PHASE GOAL
+1. Objective
 
-Transform MangaVerse from a single-device personal tool into a cross-device, intelligent companion that:
+Move MangaVerse from working authentication + database to a fully synced, user-aware experience, and prepare the system for AI personalization without implementing AI yet.
 
-syncs user data
+2. Current State (Confirmed)
 
-learns user taste over time
+Users can sign up and log in
 
-provides personalized recommendations
+Same user can log in from multiple devices
 
-remains lightweight and respectful of user ownership
+Sessions are managed correctly
 
-👤 TARGET USER
+Prisma + Neon + Auth.js are stable
 
-Manga / anime readers with multiple devices
+UserSeries data is stored per user
 
-People who track long-running series
+No piracy or content hosting
 
-Users who want smart suggestions, not generic lists
+3. Phase 4A – Data Sync & User Isolation (IMMEDIATE)
+3.1 Session-Based Access Control
 
-Privacy-aware users who dislike heavy social platforms
+Goal:
+Ensure every API and DB query is scoped to the logged-in user.
 
-✅ IN SCOPE (THIS PHASE)
-1️⃣ Authentication (Minimal, Purposeful)
+Requirements:
 
-Email or OAuth login
+Every server action must call auth()
 
-No social features
+Extract session.user.id
 
-No public profiles
+Use it as a mandatory filter in Prisma queries
 
-Identity exists only to sync data
+Acceptance Criteria:
 
-2️⃣ Database Integration
+A user can never see or modify another user’s data
 
-Use PostgreSQL + Prisma.
+Unauthenticated requests fail gracefully
 
-Core tables:
+3.2 Local → Cloud Sync on Login
 
-User
+Goal:
+Merge local (guest) progress into the cloud account.
 
-Series
+Rules:
 
-UserSeries (join table)
+Local data exists before login
 
-Store:
+On login:
 
-Title
+Compare local and cloud entries
 
-Type
+If local is newer → overwrite cloud
 
-Status
+If cloud is newer → keep cloud
 
-Progress
+Matching key: (userId + seriesId)
 
-Notes
+Conflict Resolution:
 
-Timestamps
+Use updatedAt or lastModified
 
-User ownership
+Never delete data automatically
 
-3️⃣ Sync Logic
+3.3 Cloud → Local Hydration
 
-On login → merge local data → DB
+Goal:
+After login, hydrate UI from the database.
 
-DB becomes source of truth
+Flow:
 
-Offline-first mindset (graceful failures)
+User logs in
 
-4️⃣ AI Personalization (REAL VALUE)
+Fetch all UserSeries for that user
 
-AI must use stored history, not prompts alone.
+Populate app state
 
-Model responsibilities (LOCKED):
+UI reflects cloud truth
 
-Gemini 2.0 Flash (free)
+4. Phase 4A – UX Improvements
+4.1 Auth UX States
 
-Summaries
+Required UI States:
 
-Mood-based recommendations
+Loading (session resolving)
 
-Lightweight insight generation
+Logged out (local-only mode)
 
-LLaMA 3.3 70B
+Logged in (cloud-sync enabled)
 
-Taste profiling
+Copy Guidance:
 
-Cross-series reasoning
+Logged out: “Progress saved locally”
 
-“Why you’ll like this”
+Logged in: “Progress synced across devices”
 
-Long-term preference analysis
+4.2 Error Handling
 
-AI must:
+Rules:
 
-Reference reading patterns
+No raw Prisma errors in UI
 
-Adapt recommendations over time
+All errors mapped to human-readable messages
 
-Avoid generic responses
+Auth errors never return HTML
 
-5️⃣ UX Expectations
+5. Phase 4B – AI Readiness (NO AI CALLS YET)
+5.1 AI Boundaries (Locked)
 
-AI insights must feel earned
+AI will:
 
-No flashy “AI” labels
+Recommend manga/anime
 
-Calm, confident tone
+Analyze user preferences
 
-Clear explanations
+Suggest next reads
 
-❌ OUT OF SCOPE (STRICT)
+AI will NOT:
 
-Social feeds
+Fetch chapters
 
-Comments / likes
+Provide illegal links
 
-Content hosting
+Scrape copyrighted content
 
-Piracy
+5.2 Data Preparation for AI
 
-Payments
+Prepare these fields (no inference yet):
 
-Ads
+Reading status distribution
 
-Over-automation
+Genre frequency
 
-🧱 DATA MODEL (DB)
-User {
-  id
-  email
-  createdAt
-}
+Completion rate
 
-Series {
-  id
-  title
-  type
-}
+Drop-off patterns
 
-UserSeries {
-  id
-  userId
-  seriesId
-  status
-  progress
-  notes
-  createdAt
-  updatedAt
-}
+Store as derived data or compute on demand.
 
-🎯 SUCCESS METRICS
+6. Non-Goals (Explicitly Out of Scope)
 
-User logs in on 2 devices → sees same library
+OAuth providers (Google, Discord)
 
-AI recommendations change as history grows
+Payment / subscriptions
 
-App remains fast and readable
+AI inference
 
-No unnecessary complexity visible to user
+Social features
+
+Public profiles
+
+7. Success Criteria
+
+Phase 4A is complete when:
+
+Login sync works reliably
+
+Same account works across devices
+
+No data leakage between users
+
+App works offline + online
+
+Ready to plug in AI without refactor
+
+8. Engineering Principles (Must Follow)
+
+Local-first always
+
+Cloud is optional enhancement
+
+No silent failures
+
+Explicit user ownership of data
+
+Privacy > features

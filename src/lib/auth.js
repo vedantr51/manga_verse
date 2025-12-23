@@ -1,15 +1,12 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-    // Only use adapter if prisma is available
-    ...(prisma && { adapter: PrismaAdapter(prisma) }),
     session: { strategy: "jwt" },
     pages: {
-        signIn: "/", // We use a modal, not a separate page
+        signIn: "/",
     },
     providers: [
         CredentialsProvider({
@@ -23,34 +20,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     return null;
                 }
 
-                // Check if database is available
                 if (!prisma) {
-                    console.error("Database not configured");
                     return null;
                 }
 
-                const user = await prisma.user.findUnique({
-                    where: { email: credentials.email },
-                });
+                try {
+                    const user = await prisma.user.findUnique({
+                        where: { email: credentials.email },
+                    });
 
-                if (!user || !user.password) {
+                    if (!user || !user.password) {
+                        return null;
+                    }
+
+                    const isPasswordValid = await bcrypt.compare(
+                        credentials.password,
+                        user.password
+                    );
+
+                    if (!isPasswordValid) {
+                        return null;
+                    }
+
+                    return {
+                        id: user.id,
+                        email: user.email,
+                        name: user.name,
+                    };
+                } catch (error) {
+                    console.error("Auth error:", error);
                     return null;
                 }
-
-                const isPasswordValid = await bcrypt.compare(
-                    credentials.password,
-                    user.password
-                );
-
-                if (!isPasswordValid) {
-                    return null;
-                }
-
-                return {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                };
             },
         }),
     ],

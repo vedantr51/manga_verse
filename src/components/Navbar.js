@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import AuthButton from './AuthButton';
+import SyncStatus from './SyncStatus';
 
 export default function Navbar() {
   const [isLight, setIsLight] = useState(false);
@@ -56,6 +57,9 @@ export default function Navbar() {
             About
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blade-green transition-all duration-150 group-hover:w-full" />
           </Link>
+
+          {/* Sync Status Indicator */}
+          <SyncStatus />
 
           {/* Theme Toggle Button */}
           <button
