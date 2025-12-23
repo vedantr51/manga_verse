@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import AuthModal from "./AuthModal";
+import { useSeries } from "@/lib/store";
 
 export default function AuthButton() {
     const { data: session, status } = useSession();
     const [showModal, setShowModal] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
+    const { isSyncing, syncError, lastSyncedAt } = useSeries();
 
     // Loading state
     if (status === "loading") {
@@ -15,6 +17,19 @@ export default function AuthButton() {
             <div className="w-8 h-8 rounded-full bg-gray-200 light:bg-gray-300 animate-pulse" />
         );
     }
+
+    // Format last synced time
+    const formatSyncTime = (timestamp) => {
+        if (!timestamp) return "Never";
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+
+        if (diff < 60000) return "Just now";
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        return date.toLocaleDateString();
+    };
 
     // Signed in
     if (session?.user) {
@@ -40,13 +55,39 @@ export default function AuthButton() {
                             className="fixed inset-0 z-40"
                             onClick={() => setShowDropdown(false)}
                         />
-                        <div className="absolute right-0 mt-2 w-48 py-2 bg-black light:bg-white border border-blade-silver/20 light:border-gray-200 shadow-xl z-50">
+                        <div className="absolute right-0 mt-2 w-56 py-2 bg-black light:bg-white border border-blade-silver/20 light:border-gray-200 shadow-xl z-50 rounded">
+                            {/* User Info */}
                             <div className="px-4 py-2 border-b border-blade-silver/20 light:border-gray-200">
                                 <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
                                 <p className="text-sm text-foreground font-semibold truncate">
                                     {session.user.email}
                                 </p>
                             </div>
+
+                            {/* Sync Status */}
+                            <div className="px-4 py-3 border-b border-blade-silver/20 light:border-gray-200">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-500 uppercase tracking-wider">Sync Status</span>
+                                    {syncError ? (
+                                        <span className="text-xs text-red-400 flex items-center gap-1">
+                                            <span>⚠️</span> Error
+                                        </span>
+                                    ) : isSyncing ? (
+                                        <span className="text-xs text-blade-orange flex items-center gap-1">
+                                            <span className="animate-spin">🔄</span> Syncing
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-blade-green flex items-center gap-1">
+                                            <span>☁️</span> Synced
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Last sync: {formatSyncTime(lastSyncedAt)}
+                                </p>
+                            </div>
+
+                            {/* Sign Out */}
                             <button
                                 onClick={() => signOut()}
                                 className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-500/10 transition-colors flex items-center gap-2"

@@ -118,6 +118,10 @@ export function SeriesProvider({ children }) {
                     const apiData = await fetchFromAPI();
                     if (apiData) {
                         setSeries(apiData);
+                        // Mark as synced since we loaded from cloud
+                        const now = new Date().toISOString();
+                        setLastSyncedAt(now);
+                        localStorage.setItem(LAST_SYNC_KEY, now);
                     }
                 }
             } else {
