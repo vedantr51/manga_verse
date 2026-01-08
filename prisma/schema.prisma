@@ -92,6 +92,8 @@ model UserSeries {
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  rating       Float?   @default(0) // 1.0 - 5.0 scale
+  ratedAt      DateTime?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)

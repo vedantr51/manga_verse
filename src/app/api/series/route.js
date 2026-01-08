@@ -38,6 +38,7 @@ export async function GET() {
             alternateTitles: us.series.alternateTitles,
             createdAt: us.createdAt,
             updatedAt: us.updatedAt,
+            rating: us.rating,
         }));
 
         return NextResponse.json(formatted);
@@ -77,13 +78,63 @@ export async function POST(request) {
             return NextResponse.json({ synced: results.length });
         }
 
-        // Handle single series add
+        // Check for duplicates before adding single series
+        const { title, type, externalId } = body;
+
+        // First check if user already has this series
+        let existingSeries = null;
+
+        if (externalId) {
+            // Check by externalId first (most reliable)
+            const series = await prisma.series.findUnique({
+                where: { externalId_type: { externalId, type } },
+                include: {
+                    users: {
+                        where: { userId: session.user.id }
+                    }
+                }
+            });
+            if (series?.users?.length > 0) {
+                existingSeries = series;
+            }
+        }
+
+        if (!existingSeries && title) {
+            // Fallback: check by title (for manual entries or legacy data)
+            const series = await prisma.series.findFirst({
+                where: { title, type },
+                include: {
+                    users: {
+                        where: { userId: session.user.id }
+                    }
+                }
+            });
+            if (series?.users?.length > 0) {
+                existingSeries = series;
+            }
+        }
+
+        // If duplicate found, return 409 Conflict
+        if (existingSeries) {
+            return NextResponse.json(
+                {
+                    error: "DUPLICATE_SERIES",
+                    message: `${title} is already in your library`,
+                    existingId: existingSeries.users[0].id
+                },
+                { status: 409 }
+            );
+        }
+
+        // Handle single series add (no duplicate)
         const result = await upsertUserSeries(session.user.id, body);
         return NextResponse.json(result, { status: 201 });
     } catch (error) {
         console.error("Error adding series:", error);
+        console.error("Error stack:", error.stack);
+        console.error("Error message:", error.message);
         return NextResponse.json(
-            { error: "Failed to add series" },
+            { error: "Failed to add series", details: error.message },
             { status: 500 }
         );
     }
@@ -91,7 +142,8 @@ export async function POST(request) {
 
 // Helper: Upsert a series for a user
 async function upsertUserSeries(userId, data) {
-    const { title, type, status, lastProgress, notes, externalId, thumbnailUrl, alternateTitles } = data;
+    console.log("upsertUserSeries called with userId:", userId, "data:", JSON.stringify(data));
+    const { title, type, status, lastProgress, notes, externalId, thumbnailUrl, alternateTitles, rating } = data;
 
     // Find or create the series
     // Logic: 
@@ -137,22 +189,32 @@ async function upsertUserSeries(userId, data) {
     }
 
     // Upsert the user-series relationship
+    const updateData = {
+        status,
+        lastProgress,
+        notes,
+        updatedAt: new Date(),
+    };
+
+    // Only include rating fields if rating is provided
+    if (rating !== undefined && rating !== null && rating > 0) {
+        updateData.rating = parseFloat(rating);
+        updateData.ratedAt = new Date();
+    }
+
     const userSeries = await prisma.userSeries.upsert({
         where: {
             userId_seriesId: { userId, seriesId: series.id },
         },
-        update: {
-            status,
-            lastProgress,
-            notes,
-            updatedAt: new Date(),
-        },
+        update: updateData,
         create: {
             userId,
             seriesId: series.id,
             status,
             lastProgress,
             notes,
+            rating: rating ? parseFloat(rating) : 0,
+            ratedAt: rating ? new Date() : null,
         },
         include: { series: true },
     });
@@ -170,5 +232,6 @@ async function upsertUserSeries(userId, data) {
         alternateTitles: userSeries.series.alternateTitles,
         createdAt: userSeries.createdAt,
         updatedAt: userSeries.updatedAt,
+        rating: userSeries.rating,
     };
 }

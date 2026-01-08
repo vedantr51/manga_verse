@@ -11,6 +11,11 @@ export default function TitleAutocomplete({ type = "anime", onSelect, initialVal
     const wrapperRef = useRef(null);
     const inputRef = useRef(null);
 
+    // Sync query with initialValue (for form resets)
+    useEffect(() => {
+        setQuery(initialValue);
+    }, [initialValue]);
+
     // Debounce search
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -19,7 +24,7 @@ export default function TitleAutocomplete({ type = "anime", onSelect, initialVal
                 return;
             }
 
-            // Don't search if we just selected an item (heuristic: precise match with existing suggestion code path handles this usually, but here we just check if open)
+            // Don't search if we just selected an item
             if (!isOpen && query === initialValue) return;
 
             setIsLoading(true);
@@ -29,17 +34,19 @@ export default function TitleAutocomplete({ type = "anime", onSelect, initialVal
                     const data = await res.json();
                     setSuggestions(data.results || []);
                     setIsOpen(true);
-                    setSelectedIndex(-1);
+                    // Default to first option for smoother UX
+                    setSelectedIndex(0);
                 }
             } catch (error) {
                 console.error("Search failed:", error);
+                setSuggestions([]); // Clear suggestions so manual entry is the only clear option
             } finally {
                 setIsLoading(false);
             }
         }, 500); // 500ms debounce
 
         return () => clearTimeout(timer);
-    }, [query, type, isOpen]); // removed initialValue from dep to prevent loop, logic inside handles it
+    }, [query, type]); // removed isOpen/initialValue deps as they caused focus issues
 
     // Handle outside click
     useEffect(() => {
@@ -61,11 +68,13 @@ export default function TitleAutocomplete({ type = "anime", onSelect, initialVal
             setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1));
         } else if (e.key === "Enter") {
             e.preventDefault();
-            if (selectedIndex >= 0 && suggestions[selectedIndex]) {
+            if (isOpen && selectedIndex >= 0 && suggestions[selectedIndex]) {
                 handleSelect(suggestions[selectedIndex]);
-            } else {
-                // If no suggestion selected, but user pressed enter, maybe treat as manual entry if we allowed it
-                // For now, we just close if no selection
+            } else if (isOpen && query.length > 0) {
+                // If open but no valid suggestion selected (or list empty), allow manual?
+                // For standardization, we prefer they click the manual option explicitly if no suggestion matches.
+                // But good UX might be: if no suggestions at all, Manual Entry is unique option.
+                // If suggestions exist, we want them to pick one.
                 setIsOpen(false);
             }
         } else if (e.key === "Escape") {
@@ -162,16 +171,24 @@ export default function TitleAutocomplete({ type = "anime", onSelect, initialVal
                         </div>
                     ))}
 
-                    {/* Manual Entry Fallback */}
+                    {/* Manual Entry Fallback - Explicit "Create New" style */}
                     {!isLoading && query.length > 0 && (
                         <div
                             onClick={handleManualEntry}
-                            className={`p-3 border-t border-gray-200 dark:border-zinc-700 cursor-pointer 
+                            className={`p-3 border-t border-gray-200 dark:border-zinc-700 cursor-pointer group
                                 ${selectedIndex === suggestions.length ? 'bg-blade-green/10' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                         >
-                            <p className="text-sm text-gray-500 italic">
-                                Use "<span className="font-bold not-italic text-foreground">{query}</span>" (no canonical match)
-                            </p>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-zinc-800 rounded text-gray-400 group-hover:text-blade-green transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-foreground">Create "<span className="italic">{query}</span>"</p>
+                                    <p className="text-xs text-gray-500">Not in database? Add as custom entry.</p>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

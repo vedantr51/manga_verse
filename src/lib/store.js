@@ -15,6 +15,7 @@ export function SeriesProvider({ children }) {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncError, setSyncError] = useState(null);
     const [lastSyncedAt, setLastSyncedAt] = useState(null);
+    const [toasts, setToasts] = useState([]);
 
     const isAuthenticated = status === "authenticated" && session?.user?.id;
 
@@ -157,18 +158,35 @@ export function SeriesProvider({ children }) {
 
         if (isAuthenticated) {
             try {
+                console.log("Adding series to API:", newSeries);
                 const res = await fetch("/api/series", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(newSeries),
                 });
+
                 if (res.ok) {
                     const created = await res.json();
+                    console.log("API created series:", created);
                     setSeries((prev) => [created, ...prev]);
                     return;
+                } else {
+                    // Try to parse error response safely
+                    let errorData = { error: "Unknown error" };
+                    try {
+                        const text = await res.text();
+                        if (text) {
+                            errorData = JSON.parse(text);
+                        }
+                    } catch (parseError) {
+                    }
+
+                    // Include status code in error message for duplicate detection
+                    const errorMessage = errorData.message || errorData.error || "Unknown error";
+                    throw new Error(`API error ${res.status}: ${errorMessage}`);
                 }
             } catch (error) {
-                console.error("Failed to add series to API:", error);
+                throw error; // Re-throw so form knows it failed
             }
         }
 
@@ -232,6 +250,16 @@ export function SeriesProvider({ children }) {
         await syncWithCloud(localData);
     };
 
+    // Toast notification functions
+    const showToast = useCallback((message, type = "success", duration = 3000) => {
+        const id = Date.now().toString();
+        setToasts((prev) => [...prev, { id, message, type, duration }]);
+    }, []);
+
+    const removeToast = useCallback((id) => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, []);
+
     return (
         <SeriesContext.Provider
             value={{
@@ -245,6 +273,9 @@ export function SeriesProvider({ children }) {
                 syncError,
                 lastSyncedAt,
                 triggerSync,
+                toasts,
+                showToast,
+                removeToast,
             }}
         >
             {children}

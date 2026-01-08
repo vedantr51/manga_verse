@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SessionProvider from "@/components/SessionProvider";
 import { SeriesProvider } from "@/lib/store";
+import ToastProvider from "@/components/ToastProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -23,9 +24,10 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        suppressHydrationWarning
       >
         <SessionProvider>
           <SeriesProvider>
@@ -34,6 +36,7 @@ export default function RootLayout({ children }) {
               {children}
             </main>
             <Footer />
+            <ToastProvider />
           </SeriesProvider>
         </SessionProvider>
         <Analytics />
