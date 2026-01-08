@@ -167,7 +167,7 @@ export default function SeriesList() {
         <>
             <div className="space-y-4">
                 {/* Header with search */}
-                <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                     <h2 className="Heading-lg text-2xl text-foreground whitespace-nowrap">Your Library</h2>
                     <div className="relative max-w-xs w-full">
                         <input

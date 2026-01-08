@@ -12,12 +12,26 @@ export async function POST(request) {
     }
 
     try {
-        const { email, password, name } = await request.json();
+        const { username, password, name } = await request.json();
 
         // Validate input
-        if (!email || !password) {
+        if (!username || !password) {
             return NextResponse.json(
-                { error: "Email and password are required" },
+                { error: "Username and password are required" },
+                { status: 400 }
+            );
+        }
+
+        if (username.length < 3) {
+            return NextResponse.json(
+                { error: "Username must be at least 3 characters" },
+                { status: 400 }
+            );
+        }
+
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            return NextResponse.json(
+                { error: "Username can only contain letters, numbers, and underscores" },
                 { status: 400 }
             );
         }
@@ -29,14 +43,14 @@ export async function POST(request) {
             );
         }
 
-        // Check if user already exists
+        // Check if username already exists
         const existingUser = await prisma.user.findUnique({
-            where: { email },
+            where: { username },
         });
 
         if (existingUser) {
             return NextResponse.json(
-                { error: "Email already registered" },
+                { error: "Username already taken" },
                 { status: 409 }
             );
         }
@@ -47,9 +61,9 @@ export async function POST(request) {
         // Create user
         const user = await prisma.user.create({
             data: {
-                email,
+                username,
                 password: hashedPassword,
-                name: name || email.split("@")[0],
+                name: name || username,
             },
         });
 
@@ -58,7 +72,7 @@ export async function POST(request) {
                 message: "User created successfully",
                 user: {
                     id: user.id,
-                    email: user.email,
+                    username: user.username,
                     name: user.name,
                 },
             },

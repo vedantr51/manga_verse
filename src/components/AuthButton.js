@@ -44,7 +44,7 @@ export default function AuthButton() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                     <span className="text-sm font-semibold max-w-[100px] truncate">
-                        {session.user.name || session.user.email?.split("@")[0]}
+                        {session.user.name || session.user.username}
                     </span>
                 </button>
 
@@ -60,7 +60,7 @@ export default function AuthButton() {
                             <div className="px-4 py-2 border-b border-blade-silver/20 light:border-gray-200">
                                 <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
                                 <p className="text-sm text-foreground font-semibold truncate">
-                                    {session.user.email}
+                                    @{session.user.username || session.user.name}
                                 </p>
                             </div>
 
