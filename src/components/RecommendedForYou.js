@@ -15,6 +15,7 @@ export default function RecommendedForYou() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [addingIds, setAddingIds] = useState(new Set());
+    const [addedIds, setAddedIds] = useState(new Set());
     const [dismissingIds, setDismissingIds] = useState(new Set());
     const [tier, setTier] = useState(null);
     const [message, setMessage] = useState('');
@@ -178,7 +179,7 @@ export default function RecommendedForYou() {
 
 
     const handleAddToLibrary = async (recommendation) => {
-        if (addingIds.has(recommendation.externalId)) return;
+        if (addingIds.has(recommendation.externalId) || addedIds.has(recommendation.externalId)) return;
 
         setAddingIds(prev => new Set(prev).add(recommendation.externalId));
 
@@ -196,29 +197,13 @@ export default function RecommendedForYou() {
             });
 
             showToast(`${recommendation.title} added to your library!`, 'success');
+            setAddedIds(prev => new Set(prev).add(recommendation.externalId));
 
-            // Fetch a single replacement before removing
-            const currentIds = recommendations.map(r => r.externalId);
-            const replacement = await fetchSingleReplacement([...currentIds, recommendation.externalId]);
-
-            // Replace the added item with new one (or just remove if no replacement)
-            setRecommendations(prev => {
-                const updated = prev.filter(r => r.externalId !== recommendation.externalId);
-                if (replacement) {
-                    updated.push(replacement);
-                }
-                saveRecommendations(updated, tier, page);
-                return updated;
-            });
         } catch (error) {
             if (error.message?.includes('409')) {
                 showToast(`${recommendation.title} is already in your library`, 'warning');
-                // Still remove from recommendations
-                setRecommendations(prev => {
-                    const updated = prev.filter(r => r.externalId !== recommendation.externalId);
-                    saveRecommendations(updated, tier, page);
-                    return updated;
-                });
+                // Mark as added so user sees it's done
+                setAddedIds(prev => new Set(prev).add(recommendation.externalId));
             } else {
                 showToast('Failed to add series. Please try again.', 'error');
             }
@@ -368,10 +353,13 @@ export default function RecommendedForYou() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3">
                     <button
                         onClick={() => handleAddToLibrary(item)}
-                        disabled={addingIds.has(item.externalId)}
-                        className="w-full py-2 bg-blade-orange text-white text-xs font-bold uppercase tracking-wider hover:bg-blade-orange/90 transition-colors disabled:opacity-50 rounded shadow-md transform active:scale-95 transition-transform"
+                        disabled={addingIds.has(item.externalId) || addedIds.has(item.externalId)}
+                        className={`w-full py-2 text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 rounded shadow-md transform ${addedIds.has(item.externalId)
+                                ? 'bg-green-600 hover:bg-green-600 cursor-default'
+                                : 'bg-blade-orange hover:bg-blade-orange/90 active:scale-95'
+                            }`}
                     >
-                        {addingIds.has(item.externalId) ? '...' : '+ Add'}
+                        {addingIds.has(item.externalId) ? '...' : addedIds.has(item.externalId) ? 'Added' : '+ Add'}
                     </button>
                 </div>
             </div>
