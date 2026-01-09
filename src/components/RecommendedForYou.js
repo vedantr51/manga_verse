@@ -433,44 +433,9 @@ export default function RecommendedForYou() {
 
                 </div>
 
-                {/* Horizontal scroll container with See More at end */}
+                {/* Horizontal scroll container */}
                 <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-zinc-700">
                     {items.map(renderCard)}
-
-                    {/* See More Card - inline at end of row */}
-                    <button
-                        onClick={() => handleLoadMoreForType(typeKey)}
-                        disabled={loadingMoreType[typeKey]}
-                        className="flex-shrink-0 w-36 md:w-44 group relative rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-zinc-700 hover:border-blade-orange dark:hover:border-blade-orange bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-900 dark:to-zinc-800 transition-all duration-300 hover:shadow-lg hover:shadow-blade-orange/20 disabled:opacity-50"
-                    >
-                        <div className="aspect-[2/3] flex flex-col items-center justify-center p-4">
-                            {loadingMoreType[typeKey] ? (
-                                <div className="flex flex-col items-center gap-3">
-                                    <svg className="w-8 h-8 animate-spin text-blade-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Loading...</span>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-3 group-hover:scale-110 transition-transform duration-300">
-                                    {/* Animated arrow icon */}
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blade-orange to-orange-600 flex items-center justify-center shadow-lg group-hover:shadow-blade-orange/40 transition-shadow">
-                                        <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </div>
-                                    <div className="text-center">
-                                        <span className="block text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-blade-orange transition-colors">
-                                            See More
-                                        </span>
-                                        <span className="block text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">
-                                            {title}
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </button>
                 </div>
             </div>
         );

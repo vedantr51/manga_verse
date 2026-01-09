@@ -401,9 +401,9 @@ export async function GET(request) {
 
         // Fetch all 3 types: anime, manga, and manhwa
         const [topAnime, topManga, topManhwa] = await Promise.all([
-            fetchAniListTrending('anime', 10, jikanPage),
-            fetchAniListTrending('manga', 10, jikanPage),
-            fetchAniListTrending('manhwa', 10, jikanPage)
+            fetchAniListTrending('anime', 20, jikanPage),
+            fetchAniListTrending('manga', 20, jikanPage),
+            fetchAniListTrending('manhwa', 20, jikanPage)
         ]);
 
         let topRated = [...topAnime, ...topManga, ...topManhwa];
