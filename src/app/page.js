@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import ContinueWatching from '@/components/ContinueWatching';
 import RecommendedForYou from '@/components/RecommendedForYou';
 
 export default function Home() {
@@ -52,7 +51,6 @@ export default function Home() {
       </div>
 
       {/* Personalized Recommendations (Auth Only) */}
-      <ContinueWatching />
       <RecommendedForYou />
     </>
   );
