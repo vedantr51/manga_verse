@@ -346,17 +346,7 @@ export default function RecommendedForYou() {
             key={item.externalId}
             className="flex-shrink-0 w-36 md:w-44 group relative rounded-lg overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:border-blade-orange transition-all duration-200"
         >
-            {/* Not Interested button - always visible */}
-            <button
-                onClick={() => handleDismiss(item)}
-                disabled={dismissingIds.has(item.externalId)}
-                className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-black/60 hover:bg-red-500 text-white flex items-center justify-center transition-colors"
-                title="Not Interested"
-            >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
+
 
             {/* Thumbnail */}
             <div className="aspect-[2/3] bg-gray-200 dark:bg-zinc-800 overflow-hidden relative">

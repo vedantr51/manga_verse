@@ -360,32 +360,14 @@ export async function GET(request) {
         // Fetch user's series with ratings
         const userSeries = await prisma.userSeries.findMany({
             where: { userId: session.user.id },
-            include: {
-                series: {
-                    select: {
-                        id: true,
-                        title: true,
-                        type: true,
-                        thumbnailUrl: true,
-                        externalId: true
-                    }
-                }
-            }
+            select: { series: { select: { externalId: true } } }
         });
 
-        // Need at least some rated series (lowered threshold to 3.5)
-        const qualifyingSeries = userSeries.filter(s =>
-            s.rating && ratingToWeight(s.rating) > 0
-        );
-
-        const ratedCount = qualifyingSeries.length;
-
-        // TYPE-SPECIFIC REQUEST: When type filter is specified, directly fetch for that type
-        // This is used for Refresh and See More buttons regardless of user tier
+        // TYPE-SPECIFIC REQUEST: When type filter is specified
         if (typeFilter) {
             const jikanPage = Math.max(1, page + 1);
             const limit = customLimit || 10;
-            const fetchLimit = limit * 3; // Fetch extra to account for excludes
+            const fetchLimit = limit;
 
             let topRated = [];
             if (typeFilter === 'anime') {
@@ -396,18 +378,7 @@ export async function GET(request) {
                 topRated = await fetchAniListTrending('manhwa', fetchLimit, jikanPage);
             }
 
-            // Filter out excluded IDs
-            topRated = topRated.filter(r => !excludeIds.includes(r.externalId));
-
-            // Also filter out items already in user's library
-            const userExternalIds = userSeries.map(s => s.series?.externalId).filter(Boolean);
-            topRated = topRated.filter(r => !userExternalIds.includes(r.externalId));
-
-            // Apply limit
-            const finalLimit = singleMode ? 1 : (customLimit || 10);
-            topRated = topRated.slice(0, finalLimit);
-
-            // Enrich with AniList data
+            // Enrich with AniList data (episodes/chapters)
             topRated = await enrichWithAniList(topRated);
 
             console.log(`[API] Type filter ${typeFilter}: returning ${topRated.length} items from page ${jikanPage}`);
@@ -420,181 +391,37 @@ export async function GET(request) {
             });
         }
 
-        // TIER 1: New user (no library or no ratings) - Show top-rated content
-        if (userSeries.length === 0 || ratedCount === 0) {
-            const jikanPage = Math.max(1, page + 1); // Jikan uses 1-indexed pages, minimum 1
-            // Default: 10 per type initially, customLimit for See More/Refresh
-            const limit = customLimit || (singleMode ? 3 : 10);
-            // Fetch extra to account for excludes
-            const fetchLimit = limit * 3;
+        // GLOBAL TRENDING SELECTION (For Dashboard)
+        // Always show trending, regardless of user history (Tier 1 logic for everyone)
 
-            // Fetch based on type filter or all types
-            let topRated = [];
-            if (typeFilter === 'anime') {
-                topRated = await fetchAniListTrending('anime', fetchLimit, jikanPage);
-            } else if (typeFilter === 'manga') {
-                topRated = await fetchAniListTrending('manga', fetchLimit, jikanPage);
-            } else if (typeFilter === 'manhwa') {
-                // Fetch actual Korean manhwa using the dedicated function
-                topRated = await fetchAniListTrending('manhwa', fetchLimit, jikanPage);
-            } else {
-                // Fetch all 3 types: anime, manga, and manhwa (10 each = 30 total)
-                const [topAnime, topManga, topManhwa] = await Promise.all([
-                    fetchAniListTrending('anime', 10, jikanPage),
-                    fetchAniListTrending('manga', 10, jikanPage),
-                    fetchAniListTrending('manhwa', 10, jikanPage)
-                ]);
+        const jikanPage = Math.max(1, page + 1);
+        const limit = customLimit || (singleMode ? 3 : 10);
+        // fetchLimit same as limit since we aren't filtering anymore
+        const fetchLimit = limit;
 
-                topRated = [...topAnime, ...topManga, ...topManhwa];
-            }
+        // Fetch all 3 types: anime, manga, and manhwa
+        const [topAnime, topManga, topManhwa] = await Promise.all([
+            fetchAniListTrending('anime', 10, jikanPage),
+            fetchAniListTrending('manga', 10, jikanPage),
+            fetchAniListTrending('manhwa', 10, jikanPage)
+        ]);
 
-            // Filter out excluded IDs
-            topRated = topRated.filter(r => !excludeIds.includes(r.externalId));
+        let topRated = [...topAnime, ...topManga, ...topManhwa];
 
-            // Apply limit (30 for initial load, customLimit for See More)
-            const finalLimit = singleMode ? 1 : (customLimit || 30);
-            topRated = topRated.slice(0, finalLimit);
-
-            // Enrich with AniList data
-            topRated = await enrichWithAniList(topRated);
-
-            return NextResponse.json({
-                recommendations: topRated,
-                count: topRated.length,
-                tier: 'new_user',
-                page: page,
-                message: 'Trending picks to get you started!'
-            });
+        // Apply limit only if single mode (refreshing one card)
+        if (singleMode) {
+            topRated = topRated.slice(0, 1);
         }
-
-        // TIER 2: Early-stage user (1-3 rated series) - Blend top-rated with personalized
-        if (ratedCount >= 1 && ratedCount <= 3) {
-            // Fetch some trending as fallback
-            const [topAnime, topManga, topManhwa] = await Promise.all([
-                fetchAniListTrending('anime', 3),
-                fetchAniListTrending('manga', 3),
-                fetchAniListTrending('manhwa', 3)
-            ]);
-            const topRated = [...topAnime, ...topManga, ...topManhwa].map(item => ({
-                ...item,
-                reason: item.reason || 'Trending'
-            }));
-
-            // Also try to get some personalized recommendations
-            const genreData = {};
-            const genreFetchPromises = qualifyingSeries
-                .filter(s => s.series?.externalId)
-                .slice(0, 3)
-                .map(async (s) => {
-                    const genres = await fetchSeriesGenres(s.series.externalId, s.series.type);
-                    genreData[s.series.id] = genres;
-                });
-
-            await Promise.all(genreFetchPromises);
-
-            const userProfile = buildUserPreferenceProfile(userSeries, genreData);
-
-            // Fetch personalized candidates if we have genre data
-            let personalizedCandidates = [];
-            if (userProfile.topGenres.length > 0) {
-                const topGenre = userProfile.topGenres[0];
-                const preferredType = Object.keys(userProfile.preferredTypes)[0] || 'manga';
-                personalizedCandidates = await fetchCandidatesForGenre(topGenre, preferredType, 5);
-                personalizedCandidates = personalizedCandidates.map(c => ({
-                    ...c,
-                    reason: `Because you like ${topGenre}`
-                }));
-            }
-
-            // Blend: prioritize personalized, fill with top-rated
-            const seenIds = new Set(userSeries.map(s => s.series?.externalId).filter(Boolean));
-            let blended = [...personalizedCandidates, ...topRated]
-                .filter(item => !seenIds.has(item.externalId))
-                .slice(0, 10);
-
-            // Enrich with AniList data
-            blended = await enrichWithAniList(blended);
-
-            return NextResponse.json({
-                recommendations: blended,
-                count: blended.length,
-                tier: 'early_stage',
-                message: 'Building your taste profile...',
-                userProfile: {
-                    ratedCount,
-                    topGenres: userProfile.topGenres.slice(0, 3)
-                }
-            });
-        }
-
-        // TIER 3: Established user (4+ rated series) - Full personalized recommendations
-
-        // Fetch genre data for ALL qualifying series (not just top 5)
-        const genreData = {};
-        const genreFetchPromises = qualifyingSeries
-            .filter(s => s.series?.externalId)
-            .slice(0, 8) // Increased limit for better coverage
-            .map(async (s) => {
-                const genres = await fetchSeriesGenres(s.series.externalId, s.series.type);
-                genreData[s.series.id] = genres;
-            });
-
-        await Promise.all(genreFetchPromises);
-
-        // Build user preference profile with blended weights
-        const userProfile = buildUserPreferenceProfile(userSeries, genreData);
-
-        // Fetch candidates for MULTIPLE genres (not just first one)
-        const candidatePromises = [];
-        const topGenres = userProfile.topGenres.slice(0, 3); // Top 3 genres
-        const preferredTypes = Object.keys(userProfile.preferredTypes)
-            .filter(type => userProfile.preferredTypes[type].avg >= 0.4)
-            .slice(0, 2);
-
-        // Fetch candidates for each genre x type combination
-        for (const genre of topGenres) {
-            for (const type of preferredTypes) {
-                candidatePromises.push(
-                    fetchCandidatesForGenre(genre, type, 8)
-                );
-            }
-        }
-
-        // If no candidates from genres, try a fallback
-        if (candidatePromises.length === 0 && preferredTypes.length > 0) {
-            candidatePromises.push(
-                fetchCandidatesForGenre('Action', preferredTypes[0], 15)
-            );
-        }
-
-        const candidateArrays = await Promise.all(candidatePromises);
-
-        // Deduplicate candidates by externalId
-        const seenIds = new Set();
-        const candidatePool = candidateArrays.flat().filter(c => {
-            if (seenIds.has(c.externalId)) return false;
-            seenIds.add(c.externalId);
-            return true;
-        });
-
-        // Generate recommendations with blended model
-        let recommendations = generateTasteBasedRecommendations(
-            userSeries,
-            candidatePool,
-            genreData
-        );
 
         // Enrich with AniList data
-        recommendations = await enrichWithAniList(recommendations);
+        topRated = await enrichWithAniList(topRated);
 
         return NextResponse.json({
-            recommendations,
-            count: recommendations.length,
-            userProfile: {
-                topGenres: userProfile.topGenres,
-                preferredTypes: Object.keys(userProfile.preferredTypes),
-                qualifyingSeriesCount: userProfile.qualifyingSeries.length
-            }
+            recommendations: topRated,
+            count: topRated.length,
+            tier: 'new_user', // Keep 'new_user' trigger to show "Trending Now" title on frontend
+            page: page,
+            message: 'Global trending hits right now'
         });
     } catch (error) {
         console.error("Taste-Based Recommendations Error:", error);
