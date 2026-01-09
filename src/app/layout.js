@@ -29,6 +29,23 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
         suppressHydrationWarning
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const storedTheme = localStorage.getItem('theme');
+                  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  if (storedTheme === 'dark' || (!storedTheme && systemDark)) {
+                    document.body.classList.add('dark');
+                  } else {
+                    document.body.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
         <SessionProvider>
           <SeriesProvider>
             <Navbar />

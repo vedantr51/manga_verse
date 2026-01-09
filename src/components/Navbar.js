@@ -10,10 +10,15 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Check if user has a preference or if system is dark
-    // For now, we default to Light as requested, but we can check local storage or class
-    if (document.body.classList.contains('dark')) {
+    // Check localStorage or system preference on mount
+    const storedTheme = localStorage.getItem('theme');
+
+    if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.body.classList.add('dark');
       setIsDark(true);
+    } else {
+      document.body.classList.remove('dark');
+      setIsDark(false);
     }
   }, []);
 
@@ -30,8 +35,15 @@ export default function Navbar() {
   }, [mobileMenuOpen]);
 
   const toggleTheme = () => {
-    document.body.classList.toggle('dark');
-    setIsDark(!isDark);
+    if (isDark) {
+      document.body.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setIsDark(false);
+    } else {
+      document.body.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDark(true);
+    }
   };
 
   return (
