@@ -344,7 +344,7 @@ export default function RecommendedForYou() {
     const renderCard = (item) => (
         <div
             key={item.externalId}
-            className="flex-shrink-0 w-36 md:w-44 group relative rounded-lg overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:border-blade-orange transition-all duration-200"
+            className="flex-shrink-0 w-36 md:w-44 group relative rounded-lg overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:border-blade-orange/50 transition-all duration-200 snap-start hover:scale-[1.02] hover:shadow-lg hover:-translate-y-0.5"
         >
 
 
@@ -354,7 +354,7 @@ export default function RecommendedForYou() {
                     <img
                         src={item.thumbnailUrl}
                         alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -369,7 +369,7 @@ export default function RecommendedForYou() {
                     <button
                         onClick={() => handleAddToLibrary(item)}
                         disabled={addingIds.has(item.externalId)}
-                        className="w-full py-2 bg-blade-orange text-white text-xs font-bold uppercase tracking-wider hover:bg-blade-orange/90 transition-colors disabled:opacity-50 rounded"
+                        className="w-full py-2 bg-blade-orange text-white text-xs font-bold uppercase tracking-wider hover:bg-blade-orange/90 transition-colors disabled:opacity-50 rounded shadow-md transform active:scale-95 transition-transform"
                     >
                         {addingIds.has(item.externalId) ? '...' : '+ Add'}
                     </button>
@@ -378,7 +378,7 @@ export default function RecommendedForYou() {
 
             {/* Content */}
             <div className="p-2">
-                <h3 className="font-semibold text-xs text-foreground mb-0.5 line-clamp-2 leading-tight">
+                <h3 className="font-semibold text-xs text-foreground mb-0.5 line-clamp-2 leading-tight group-hover:text-blade-orange transition-colors">
                     {item.title}
                 </h3>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -421,21 +421,45 @@ export default function RecommendedForYou() {
         </div>
     );
 
-    // Render a type row with See More button inline and per-row refresh
+    // Contextual subtitles mapping
+    const getSubtitle = (type) => {
+        switch (type) {
+            case 'anime': return 'Top airing & trending this season';
+            case 'manga': return 'Most popular publishing titles';
+            case 'manhwa': return 'Trending webtoons & comics';
+            default: return 'Trending now';
+        }
+    };
+
+    // Render a type row with enhanced scroll UX
     const renderTypeRow = (title, items, typeKey) => {
         if (items.length === 0) return null;
 
         return (
-            <div className="mb-10">
-                {/* Row header with title and refresh button */}
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-foreground">{title}</h3>
-
+            <div className="mb-12">
+                {/* Row header with contextual label */}
+                <div className="flex flex-col mb-4 px-1">
+                    <h3 className="text-xl font-bold text-foreground tracking-tight">{title}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        {getSubtitle(typeKey)}
+                    </p>
                 </div>
 
-                {/* Horizontal scroll container */}
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-zinc-700">
-                    {items.map(renderCard)}
+                {/* Scroll Wrapper for Gradients */}
+                <div className="relative group/scroll -mx-6 px-6">
+                    {/* Left Gradient Fade */}
+                    <div className="absolute left-0 top-0 bottom-4 w-12 bg-gradient-to-r from-gray-50 dark:from-[#151517] to-transparent z-10 pointer-events-none opacity-0 group-hover/scroll:opacity-100 transition-opacity duration-300" />
+
+                    {/* Horizontal scroll container */}
+                    <div className="flex gap-4 overflow-x-auto pb-8 pt-2 -mt-2 scroll-smooth snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                        {items.map(renderCard)}
+
+                        {/* Right padding spacer for snapping */}
+                        <div className="w-2 flex-shrink-0" />
+                    </div>
+
+                    {/* Right Gradient Fade */}
+                    <div className="absolute right-0 top-0 bottom-4 w-24 bg-gradient-to-l from-gray-50 dark:from-[#151517] to-transparent z-10 pointer-events-none" />
                 </div>
             </div>
         );
