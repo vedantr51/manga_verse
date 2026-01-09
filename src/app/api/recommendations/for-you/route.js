@@ -7,38 +7,76 @@ import { generateTasteBasedRecommendations, buildUserPreferenceProfile, ratingTo
 const jikanCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
+// Request queue for rate limiting
+const requestQueue = [];
+let isProcessingQueue = false;
+
+async function processQueue() {
+    if (isProcessingQueue || requestQueue.length === 0) return;
+    isProcessingQueue = true;
+
+    while (requestQueue.length > 0) {
+        const { url, resolve, reject } = requestQueue[0]; // Peek
+
+        try {
+            // Respect Jikan's rate limit: 3 req/sec => ~333ms. Using 400ms to be safe.
+            await new Promise(r => setTimeout(r, 400));
+
+            console.log(`[fetchJikan] Fetching: ${url}`);
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                if (response.status === 429) {
+                    console.warn(`[fetchJikan] Rate limited on ${url}, retrying...`);
+                    // Wait longer and retry - don't shift queue yet
+                    await new Promise(r => setTimeout(r, 1000));
+                    continue;
+                }
+                throw new Error(`Jikan API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            jikanCache.set(url, { data, timestamp: Date.now() });
+
+            // Clean old cache entries (simple LRU)
+            if (jikanCache.size > 100) {
+                const firstKey = jikanCache.keys().next().value;
+                jikanCache.delete(firstKey);
+            }
+
+            // Success - remove from queue and resolve
+            requestQueue.shift();
+            resolve(data);
+        } catch (error) {
+            console.error(`[fetchJikan] Error processing ${url}:`, error);
+            requestQueue.shift(); // Remove failed request
+            reject(error);
+        }
+    }
+
+    isProcessingQueue = false;
+}
+
 /**
- * Fetch data from Jikan API with caching and rate limiting
+ * Fetch data from Jikan API with caching and queue-based rate limiting
  */
-async function fetchJikan(url, bypassCache = false) {
+function fetchJikan(url, bypassCache = false) {
+    // 1. Check cache first (sync) to avoid queue if possible
     if (!bypassCache) {
         const cached = jikanCache.get(url);
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
             console.log(`[fetchJikan] Cache hit for: ${url}`);
-            return cached.data;
+            return Promise.resolve(cached.data);
         }
     } else {
         console.log(`[fetchJikan] Bypassing cache for: ${url}`);
     }
 
-    // Rate limiting: wait 350ms between requests (3 req/sec max)
-    await new Promise(resolve => setTimeout(resolve, 350));
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Jikan API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    jikanCache.set(url, { data, timestamp: Date.now() });
-
-    // Clean old cache entries (simple LRU)
-    if (jikanCache.size > 100) {
-        const firstKey = jikanCache.keys().next().value;
-        jikanCache.delete(firstKey);
-    }
-
-    return data;
+    // 2. Add to queue for network request
+    return new Promise((resolve, reject) => {
+        requestQueue.push({ url, resolve, reject });
+        processQueue();
+    });
 }
 
 /**
@@ -81,7 +119,12 @@ async function fetchCandidatesForGenre(genre, type, limit = 10) {
         }
 
         const endpoint = type === 'anime' ? 'anime' : 'manga';
-        const url = `https://api.jikan.moe/v4/${endpoint}?genres=${genreId}&order_by=score&sort=desc&limit=${limit}`;
+        let typeParam = '';
+        if (type === 'manhwa') {
+            typeParam = '&type=manhwa';
+        }
+
+        const url = `https://api.jikan.moe/v4/${endpoint}?genres=${genreId}&order_by=score&sort=desc&limit=${limit}${typeParam}`;
 
         const data = await fetchJikan(url);
 
@@ -103,62 +146,94 @@ async function fetchCandidatesForGenre(genre, type, limit = 10) {
     }
 }
 
+
 /**
- * Fetch top-rated series from Jikan (for new users)
- * @param {String} type - anime or manga
- * @param {Number} limit - Max results
- * @param {Number} page - Page number for offset (starts at 1 for Jikan)
+ * Fetch REAL trending data from AniList (Activity-based)
+ * This is much better for "Trending on the internet" than MAL's Top Rated Airing
  */
-async function fetchTopRated(type, limit = 5, page = 1, bypassCache = false) {
-    const endpoint = type === 'anime' ? 'anime' : 'manga';
-    const url = `https://api.jikan.moe/v4/top/${endpoint}?limit=${limit}&page=${page}`;
-    console.log(`[fetchTopRated] Fetching: ${url}`);
+async function fetchAniListTrending(type, limit = 5, page = 1) {
+    const aniListType = type === 'anime' ? 'ANIME' : 'MANGA';
+    const isManhwa = type === 'manhwa';
+    const countryFilter = isManhwa ? ', countryOfOrigin: "KR"' : '';
 
-    const data = await fetchJikan(url, bypassCache);
-    console.log(`[fetchTopRated] Got ${data?.data?.length || 0} items for ${type}`);
+    // For Manga (JP), exclude KR/CN to separate them from Manhwa
+    const formatFilter = (type === 'manga') ? ', countryOfOrigin: "JP"' : '';
 
-    return (data.data || []).map(item => ({
-        externalId: item.mal_id?.toString(),
-        title: item.title,
-        type: type,
-        thumbnailUrl: item.images?.jpg?.image_url,
-        genres: item.genres?.map(g => g.name) || [],
-        jikanScore: item.score,
-        episodes: item.episodes || null,
-        chapters: item.chapters || null,
-        status: item.status,
-        synopsis: item.synopsis,
-        reason: `Top Rated ${type.charAt(0).toUpperCase() + type.slice(1)}`
-    }));
+    const query = `
+    query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+            media(type: ${aniListType}, sort: TRENDING_DESC, isAdult: false${countryFilter}${formatFilter}) {
+                idMal
+                title {
+                    romaji
+                    english
+                    native
+                }
+                coverImage {
+                    extraLarge
+                    large
+                }
+                description
+                averageScore
+                episodes
+                chapters
+                status
+                genres
+                type
+                format
+            }
+        }
+    }
+    `;
+
+    try {
+        console.log(`[fetchAniListTrending] Fetching ${type} page ${page}`);
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query,
+                variables: { page, perPage: limit }
+            }),
+            next: { revalidate: 3600 } // Next.js dedicated cache for 1 hour
+        });
+
+        if (!response.ok) {
+            throw new Error(`AniList API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const items = data.data?.Page?.media || [];
+
+        return items.map(item => ({
+            externalId: item.idMal?.toString() || null, // Some webtoons lack MAL ID, handling this is tricky but UI needs externalId
+            title: item.title?.english || item.title?.romaji,
+            type: type, // Force our internal type
+            thumbnailUrl: item.coverImage?.extraLarge || item.coverImage?.large,
+            genres: item.genres || [],
+            jikanScore: item.averageScore ? item.averageScore / 10 : null, // Convert 100-scale to 10-scale
+            episodes: item.episodes,
+            chapters: item.chapters,
+            status: mapAniListStatus(item.status),
+            synopsis: item.description?.replace(/<[^>]*>/g, '') || '', // Strip HTML
+            reason: `Trending #${items.indexOf(item) + 1 + ((page - 1) * limit)}`
+        })).filter(i => i.externalId); // Filter out items without MAL IDs to maintain compatibility with Jikan-based system
+    } catch (error) {
+        console.error(`[fetchAniListTrending] Error:`, error);
+        return [];
+    }
 }
 
-/**
- * Fetch top-rated manhwa (Korean manga) from Jikan
- * Uses the type=manhwa filter to get only Korean comics
- * @param {Number} limit - Max results
- * @param {Number} page - Page number for offset
- */
-async function fetchTopManhwa(limit = 5, page = 1, bypassCache = false) {
-    // Jikan manga search with type=manhwa filter for Korean comics
-    // Order by score to get top-rated
-    const url = `https://api.jikan.moe/v4/manga?type=manhwa&order_by=score&sort=desc&limit=${limit}&page=${page}&min_score=7`;
-    console.log(`[fetchTopManhwa] Fetching: ${url}`);
-
-    const data = await fetchJikan(url, bypassCache);
-    console.log(`[fetchTopManhwa] Got ${data?.data?.length || 0} items`);
-
-    return (data.data || []).map(item => ({
-        externalId: item.mal_id?.toString(),
-        title: item.title,
-        type: 'manhwa',
-        thumbnailUrl: item.images?.jpg?.image_url,
-        genres: item.genres?.map(g => g.name) || [],
-        jikanScore: item.score,
-        chapters: item.chapters || null,
-        status: item.status,
-        synopsis: item.synopsis,
-        reason: 'Top Rated Manhwa'
-    }));
+function mapAniListStatus(status) {
+    if (status === 'FINISHED') return 'Finished';
+    if (status === 'RELEASING') return 'Publishing';
+    if (status === 'NOT_YET_RELEASED') return 'Not Yet Released';
+    if (status === 'CANCELLED') return 'Cancelled';
+    if (status === 'HIATUS') return 'Hiatus';
+    return status;
 }
 
 /**
@@ -314,11 +389,11 @@ export async function GET(request) {
 
             let topRated = [];
             if (typeFilter === 'anime') {
-                topRated = await fetchTopRated('anime', fetchLimit, jikanPage, bypassCache);
+                topRated = await fetchAniListTrending('anime', fetchLimit, jikanPage);
             } else if (typeFilter === 'manga') {
-                topRated = await fetchTopRated('manga', fetchLimit, jikanPage, bypassCache);
+                topRated = await fetchAniListTrending('manga', fetchLimit, jikanPage);
             } else if (typeFilter === 'manhwa') {
-                topRated = await fetchTopManhwa(fetchLimit, jikanPage, bypassCache);
+                topRated = await fetchAniListTrending('manhwa', fetchLimit, jikanPage);
             }
 
             // Filter out excluded IDs
@@ -356,18 +431,18 @@ export async function GET(request) {
             // Fetch based on type filter or all types
             let topRated = [];
             if (typeFilter === 'anime') {
-                topRated = await fetchTopRated('anime', fetchLimit, jikanPage);
+                topRated = await fetchAniListTrending('anime', fetchLimit, jikanPage);
             } else if (typeFilter === 'manga') {
-                topRated = await fetchTopRated('manga', fetchLimit, jikanPage);
+                topRated = await fetchAniListTrending('manga', fetchLimit, jikanPage);
             } else if (typeFilter === 'manhwa') {
                 // Fetch actual Korean manhwa using the dedicated function
-                topRated = await fetchTopManhwa(fetchLimit, jikanPage);
+                topRated = await fetchAniListTrending('manhwa', fetchLimit, jikanPage);
             } else {
                 // Fetch all 3 types: anime, manga, and manhwa (10 each = 30 total)
                 const [topAnime, topManga, topManhwa] = await Promise.all([
-                    fetchTopRated('anime', 10, jikanPage),
-                    fetchTopRated('manga', 10, jikanPage),
-                    fetchTopManhwa(10, jikanPage) // Actual Korean manhwa
+                    fetchAniListTrending('anime', 10, jikanPage),
+                    fetchAniListTrending('manga', 10, jikanPage),
+                    fetchAniListTrending('manhwa', 10, jikanPage)
                 ]);
 
                 topRated = [...topAnime, ...topManga, ...topManhwa];
@@ -388,20 +463,21 @@ export async function GET(request) {
                 count: topRated.length,
                 tier: 'new_user',
                 page: page,
-                message: 'Top rated picks to get you started!'
+                message: 'Trending picks to get you started!'
             });
         }
 
         // TIER 2: Early-stage user (1-3 rated series) - Blend top-rated with personalized
         if (ratedCount >= 1 && ratedCount <= 3) {
-            // Fetch some top-rated as fallback
-            const [topAnime, topManga] = await Promise.all([
-                fetchTopRated('anime', 3),
-                fetchTopRated('manga', 3)
+            // Fetch some trending as fallback
+            const [topAnime, topManga, topManhwa] = await Promise.all([
+                fetchAniListTrending('anime', 3),
+                fetchAniListTrending('manga', 3),
+                fetchAniListTrending('manhwa', 3)
             ]);
-            const topRated = [...topAnime, ...topManga].map(item => ({
+            const topRated = [...topAnime, ...topManga, ...topManhwa].map(item => ({
                 ...item,
-                reason: item.reason || 'Top Rated'
+                reason: item.reason || 'Trending'
             }));
 
             // Also try to get some personalized recommendations

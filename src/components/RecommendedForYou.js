@@ -497,7 +497,7 @@ export default function RecommendedForYou() {
                         </svg>
                         <div>
                             <h2 className="Heading-lg text-2xl text-foreground">
-                                {tier === 'new_user' ? 'Top Picks to Get Started' : 'Recommended for You'}
+                                {tier === 'new_user' ? 'Trending Now' : 'Recommended for You'}
                             </h2>
                             {message && tier !== 'established' && (
                                 <p className="text-sm text-gray-500 mt-0.5">{message}</p>
